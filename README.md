@@ -1,7 +1,14 @@
 # Ember-data-adapter-database
 
-This README outlines the details of collaborating on this Ember application.
-A short introduction of this app could easily go here.
+本项目讲解如何使用adapter、EmberData以及怎么连接到本地数据库。
+
+### 主要内容
+
+  - 适配器使用
+  - 如何持久化数据到本地数据库
+  - 简单的后端服务
+
+
 
 ## Prerequisites
 
@@ -50,4 +57,3 @@ Specify what it takes to deploy your app.
 * Development Browser Extensions
   * [ember inspector for chrome](https://chrome.google.com/webstore/detail/ember-inspector/bmdblncegkenkacieihfhpjfppoconhi)
   * [ember inspector for firefox](https://addons.mozilla.org/en-US/firefox/addon/ember-inspector/)
-
