@@ -1,3 +1,12 @@
+<!--
+@Author: ubuntuvim
+@Date:   2016-07-23T13:21:23+08:00
+@Last modified by:   ubuntuvim
+@Last modified time: 2016-07-23T13:23:57+08:00
+-->
+
+
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -9,6 +18,8 @@
 
     {{content-for "head"}}
 
+    <link href="//cdn.bootcss.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="assets/vendor.css">
     <link rel="stylesheet" href="assets/ember-data-adapter-database.css">
 
@@ -17,9 +28,13 @@
   <body>
     {{content-for "body"}}
 
+
     <script src="assets/vendor.js"></script>
     <script src="assets/ember-data-adapter-database.js"></script>
 
     {{content-for "body-footer"}}
+
+    
+    <script src="//cdn.bootcss.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
   </body>
 </html>
