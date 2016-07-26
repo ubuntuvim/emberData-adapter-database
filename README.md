@@ -292,7 +292,7 @@ locationType: 'hash',
         {{user.username}}
       </td>
       <td>
-        {{usre.email}}
+        {{user.email}}
       </td>
     </tr>
     {{/each}}
@@ -311,6 +311,323 @@ export default Ember.Route.extend({
   }
 });
 ```
+
+目前项目还没连接到任何数据库，也没有使用自定义的适配器，如果直接执行[http://localhost:4200/#/user](http://localhost:4200/#/user)可以在控制台看到是会报错的。那么下一步该如何处理呢？？
+
+## 加入适配器
+
+### 使用`RESTAdapter`
+
+先从适配器下手！在前面已经创建好了适配器，如果是2.0之后的项目默认会创建`JSONAPIAdapter`这个适配器所接收、发送的数据格式都必须符合jsonapi规范，否则会报错，无法正常完成数据的交互。不过为了简便我们先不使用这个适配器，改用另一个简单的适配器`RESTAdapter`，这个适配器不是需要遵循jsonapi规范，只要自己约定好前后端的数据格式即可。
+
+```js
+// app/adapters/application.js
+
+// import JSONAPIAdapter from 'ember-data/adapters/json-api';
+import DS from 'ember-data';
+
+export default DS.RESTAdapter.extend({
+
+});
+```
+
+手动修改好之后的适配器还不能起作用，这个适配器并没有连接到任何的后端服务，如果你想连接到你的服务上需要使用属性`host`指定。
+
+```js
+// app/adapters/application.js
+
+// import JSONAPIAdapter from 'ember-data/adapters/json-api';
+import DS from 'ember-data';
+
+export default DS.RESTAdapter.extend({
+  host: 'http://localhost:4200'
+});
+```
+
+等待项目重启完毕，仍然是访问[http://localhost:4200/#/user](http://localhost:4200/#/user)，在控制台仍然看到前面的错误，截图如下：
+
+![无后端服务](/Users/ubuntuvim/Pictures/博客图片/ember博客/16072601.tiff)
+
+为何还是错误呢？如果能看到错误说明你的程序是正确，到目前为止还没提供任何的后端服务，虽然前面使用`ember g server`创建了node后端服务，但是并没有针对每个请求做处理。当你访问路由`user`在进入回到`model`时候会发送请求获取所有模型`user`数据，请求首选转到Ember Data（store)，但是在store中并没有，然后请求继续转到适配器`RESTAdapter`，适配器会构建URL得到`GET`请求`http://localhost:4200/users`，至于是如何构建URL的请看[]()。这个请求可以在报错的信息中看到。但是为何会报错呢？很正常，因为我的后端服务并没响应这个请求。下面针对这个请求做处理。
+
+修改`server/index.js`。
+
+```js
+/*jshint node:true*/
+
+// To use it create some files under `mocks/`
+// e.g. `server/mocks/ember-hamsters.js`
+//
+// module.exports = function(app) {
+//   app.get('/ember-hamsters', function(req, res) {
+//     res.send('hello');
+//   });
+// };
+
+module.exports = function(app) {
+  var globSync   = require('glob').sync;
+  var mocks      = globSync('./mocks/**/*.js', { cwd: __dirname }).map(require);
+  var proxies    = globSync('./proxies/**/*.js', { cwd: __dirname }).map(require);
+
+  // Log proxy requests
+  var morgan  = require('morgan');
+  app.use(morgan('dev'));
+
+  // 对象转json
+  //  const serialise = require('object-tojson')
+  const bodyParser = require('body-parser');
+
+  mocks.forEach(function(route) { route(app); });
+  proxies.forEach(function(route) { route(app); });
+
+  app.use(bodyParser.urlencoded({ extended: true }));
+
+
+  // 处理请求 http://localhost:4200/user
+  app.get('/users', function(req, res) {
+    // 返回三个对象
+    res.status(200).send({
+        users: [
+          {
+            id: 1,
+            username: 'ubuntuvim',
+            email: '123@qq.com'
+          },
+          {
+            id: 2,
+            username: 'ddlisting.com',
+            email: '3333@qq.com'
+          },
+          {
+            id: 3,
+            username: 'www.ddlising.com',
+            email: '1527254027@qq.com'
+          }
+        ]
+    });
+  });
+
+};
+```
+
+在服务端增加了一个node请求处理，拦截`/users`这个请求。对于express不是本文的重点，请自行学习，网址[expressjs.com](http://expressjs.com/zh-cn/)。如果你使用的是其他语言的服务端程序，那么你只需要返回的json格式为：`{"modelName":[{"id":1,"属性名":"属性值","属性名2":"属性值2"},{"id":2,"属性名3":"属性值3","属性名4":"属性4"}]}`，只需要格式正确适配器就能正确解析返回的数据。
+
+另外再多介绍一个属性`namespace`，这个属性是用于定义URL前缀的，比如下面的适配器定义：
+
+```javascript
+// app/adapters/application.js
+
+// import JSONAPIAdapter from 'ember-data/adapters/json-api';
+import DS from 'ember-data';
+
+export default DS.RESTAdapter.extend({
+  namespace: 'api/v1',
+  host: 'http://localhost:4200'
+});
+```
+
+如果是这样定义那么后端处理的URL也需要做相应的处理，需要在拦截的请求上加前缀，比如下面的代码。
+
+```js
+// 处理请求 http://localhost:4200/api/v1/user
+  app.get('/api/v1/users', function(req, res) {
+    // 返回三个对象
+    res.status(200).send({
+        users: [
+          {
+            id: 1,
+            username: 'ubuntuvim',
+            email: '123@qq.com'
+          },
+          {
+            id: 2,
+            username: 'ddlisting.com',
+            email: '3333@qq.com'
+          },
+          {
+            id: 3,
+            username: 'www.ddlising.com',
+            email: '1527254027@qq.com'
+          }
+        ]
+    });
+  });
+```
+
+之前面唯一不同的就是请求的URL不一样了，原来是[http://localhost:4200/user](http://localhost:4200/user)改为[http://localhost:4200/api/v1/user](http://localhost:4200/api/v1/user)。那么这样做的好处是什么呢？当你的后端的API更新的时候这个设置是非常有用的，只需要设置命名前缀就能适应不用版本的API。
+
+项目重启之后，再次进入到路由`users`可以看到返回的3条数据。如下截图：
+
+![结果列表]()
+
+到此，我想你应该知道个大概了吧！！更多有关适配器的介绍请看下面的2篇博文：
+
+1. [adapter与serializer使用示例一](http://blog.ddlisting.com/2016/06/06/adapter-serializer/)
+2. [adapter与serializer使用示例二](http://blog.ddlisting.com/2016/06/07/adapter-serializershi2/)
+
+
+### 使用`JSONAPIAdapter`
+
+使用`JSONAPIAdapter`适配器和使用`RESTAdapter`适配器有何不同呢？我觉得最重要的一点是：数据规范。`JSONAPIAdapter`适配器要求交互的数据格式必须遵循[jsonapi](http://jsonapi.org)规范，否则是不能完成数据交互的。要求高了相应的你的处理代码也相应的要复杂。下面我们改用`JSONAPIAdapter`处理。
+
+```js
+// app/adapters/application.js
+
+import JSONAPIAdapter from 'ember-data/adapters/json-api';
+import DS from 'ember-data';
+
+// export default DS.RESTAdapter.extend({
+export default JSONAPIAdapter.extend({
+  namespace: 'api/v1',
+  host: 'http://localhost:4200'
+});
+```
+
+修改适配器为`JSONAPIAdapter`。如果你不修改后端的服务那么控制台可以看到报错信息。
+
+![JSONAPIAdapter报错信息]()
+
+从截图当中可以清楚地看到报错出来的错误，`must return a valid JSON API document`必须是一个有效jsonapi文档。要修复好这个错误也很简单，只需要滚吧后端服务返回的数据格式改成jsonapi的就行了。请看下面的代码：
+
+```js
+// 处理请求 http://localhost:4200/user
+  app.get('/api/v1/users', function(req, res) {
+    // 返回三个对象
+    // res.status(200).send({
+    //     users: [
+    //       {
+    //         id: 1,
+    //         username: 'ubuntuvim',
+    //         email: '123@qq.com'
+    //       },
+    //       {
+    //         id: 2,
+    //         username: 'ddlisting.com',
+    //         email: '3333@qq.com'
+    //       },
+    //       {
+    //         id: 3,
+    //         username: 'www.ddlising.com',
+    //         email: '1527254027@qq.com'
+    //       }
+    //     ]
+    // });
+  
+    // 构建jsonapi对象
+    var input = {
+        data: [
+            {
+                id: '1',
+                type: 'user',  //对应前端程序中模型的名字
+                attributes: {   // 模型中的属性键值对
+                    username: 'ubuntuvim', property: true,
+                    email: '123@qq.com', property: true
+                }
+            },
+            {
+                id: '2',
+                type: 'user',  //对应前端程序中模型的名字
+                attributes: {   // 模型中的属性键值对
+                    username: 'ddlisting.com', property: true,
+                    email: '3333@qq.com', property: true
+                }
+            },
+            {
+                id: '3',
+                type: 'user',  //对应前端程序中模型的名字
+                attributes: {   // 模型中的属性键值对
+                    username: 'www.ddlising.com', property: true,
+                    email: '1527254027@qq.com', property: true
+                }
+            }
+        ]
+    };
+
+    res.status(200).send(JSON.stringify(input));
+  });
+```
+
+注：为了构建jsonapi对象更加简便另外在安装一个插件： `npm install jsonapi-parse`。安装完毕后手动关闭再重启项目。然后再次进入路由`users`可以看到与前面的结果一样，正确了显示后端返回的数据。
+
+到此，我相信读者应该能明白这两个适配器之间的差别了！**需要注意的是Ember.js`2.0`版本之后`JSONAPIAdapter`作为默认的适配器，也就是说平常如果你没有自定义任何适配器那么Ember Data会默认使用的是`JSONAPIAdapter`适配器。所以如果你没有使用其他的适配器那么你的后端返回的数据格式必须是遵循jsonapi规范的。另外在路由`users.js`中使用到Ember Data提供的方法`findAll('modelName')`，我想从中你也应该明白了Ember Data是何等重要了吧**
+
+看到这里不知道读者是否已经明白适配器和后端服务的关联关系？如果有疑问请给我留言。
+文中所说的后端就是我的node程序（放在`server`目录下），前端就是我的Ember.js项目。
+
+下面就是再结合数据库。
+
+## 加入数据库
+
+其实到这步加不加数据库已经不那么重要了！重要把服务端返回的数据改成从数据库读取就完了。我就简单讲解了。
+
+### 连接MySQL
+
+连接MySQL的工作交给前面已经安装好的`node-mysql`，如果还没安装请执行命令`npm install mysqljs/mysql`进行安装。继续修改后端服务代码`server/index.js`。
+
+```js
+
+module.exports = function(app) {
+  // 与之前的内容不变 
+  // 
+  // 引入MySQL模块
+  var mysql = require('mysql');
+  // 获取连接对象
+  var conn = mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      // 开启debug，可以在启动ember项目的终端看到更多详细的信息
+      database: 'test'
+  });
+
+  // 处理请求 http://localhost:4200/user
+  app.get('/api/v1/users', function(req, res) {
+
+    var jsonArr = new Array();
+
+    // 打开数据库连接
+    conn.connect();
+    //查询数据
+    conn.query('select * from user', function(err, rows, fields) {
+        if (err) throw err;
+
+        //遍历返回的数据并设置到返回的json对象中
+        for (var i = 0; i < rows.length; i++) {
+            
+            jsonArr.push({
+                id: rows[i].id,
+                username: rows[i].username,
+                email: rows[i].email
+            });
+        }
+
+        // 返回前端
+        res.status(200).send({
+            users: jsonArr
+        });
+
+    });
+    // 关闭数据库连接
+    conn.end();
+  });
+
+};
+```
+
+相比之前的代码只是引入了mysql，增加连接对象声明，然后在请求处理方法里查询数据，默认在数据库初始化了3条数据，如下截图，另外 **为了简单起见我仍然使用的是`RESTAdapter`适配器，这样处理也相对简单。** 获取连接对象的代码应该不用过多解释了，就是填写你本地连接数据库的对应配置信息就行了。
+
+![数据库数据]()
+
+
+记得修改适配器为`RESTAdapter`。
+
+重启项目。进入路由`users`可以看到数据库的数据正确显示出来了。
+
+![显示数据库数据]()
+
+<br>
+未完待续，后面将介绍增加、修改、删除数据的方法，另外如果有时间再把分页也引入
+
 
 ## 文章源码
 
