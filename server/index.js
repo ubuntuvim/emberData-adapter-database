@@ -102,12 +102,13 @@ module.exports = function(app) {
   app.get('/api/v1/users/:id', function(req, res) {
 
     var jsonArr = new Array();
-    console.log('req.params.id = ' + req.params.id);
+    var id = req.params.id;
+    console.log('req.params.id = ' + id);
     // 打开数据库连接
     pool.getConnection(function(err, conn) {  
-      // var queryParams = [ req.params.id ];
+      // var queryParams = [ id ];
       
-      var query = conn.query('select * from user where id = ?', [ req.params.id ], function(err, results, fields) {  
+      var query = conn.query('select * from user where id = ?', [ id ], function(err, results, fields) {  
           if (err) {
             console.log(err);
             throw err;
@@ -120,13 +121,21 @@ module.exports = function(app) {
               username: results[0].username,
               email: results[0].email
           });
-        }
-          
-        // 返回前端
-        res.status(200).send({
-            users: jsonArr
-        });
 
+          // 返回前端
+          res.status(200).send({
+              users: jsonArr
+          });
+        } else {  //没有数据返回一个空的
+          // 返回前端
+          res.status(200).send({
+              users: {
+                id: '',
+                username: '',
+                email: ''
+              }
+          });
+        } 
       });
       console.log('sql: ' + query.sql);  //
       conn.release();  //释放连接，放回到连接池
@@ -157,7 +166,16 @@ module.exports = function(app) {
                   email: email
                 }
             });
-          }
+          } else {  //没有数据返回一个空的
+            // 返回前端
+            res.status(200).send({
+                users: {
+                  id: '',
+                  username: '',
+                  email: ''
+                }
+            });
+          } 
           
       });
       console.log('sql: ' + query.sql);
@@ -192,12 +210,23 @@ module.exports = function(app) {
               username: results[0].username,
               email: results[0].email
           });
+
+          // 返回前端
+          res.status(200).send({
+              users: jsonArr
+          });
         }
+        //  else {  //没有数据返回一个空的
+        //   // 返回前端
+        //   res.status(200).send({
+        //       users: {
+        //         id: '',
+        //         username: '',
+        //         email: ''
+        //       }
+        //   });
+        // } 
         console.log('SQL: ' + query.sql);
-        // 返回前端
-        res.status(200).send({
-            users: jsonArr
-        });
 
       });
       conn.release();  //释放连接，放回到连接池
@@ -214,30 +243,17 @@ module.exports = function(app) {
     // 打开数据库连接
     pool.getConnection(function(err, conn) {  
       var queryParams = [ id ];  
-      var query = conn.query('select * from user where id = ?', queryParams, function(err, results, fields) {  
-          if (err) {
-            console.log(err);
-            throw err;
-        } 
-
-        //遍历返回的数据并设置到返回的json对象中，通常情况下只有一个数据，直接取第一个数据返回
-        if (results && results.length > 0) {
-          jsonArr.push({
-              id: results[0].id,
-              username: results[0].username,
-              email: results[0].email
-          });
-        }
-
-      });
-
-      query = conn.query('delete from user where id = ?', queryParams, function(err, result) {  
+      var query = conn.query('delete from user where id = ?', queryParams, function(err, result) {  
           if (err) throw err;
-      });
-      console.log('jsonArr == ' + jsonArr);
-      // 删除的数据返回前端
-      res.status(200).send({
-          users: jsonArr
+
+          // 返回前端
+          res.status(200).send({
+              users: {
+                id: id,
+                username: '',
+                email: ''
+              }
+          });
       });
 
       console.log('sql: ' + query.sql);
