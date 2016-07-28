@@ -79,7 +79,7 @@
 使用[ember-cli](http://ember-cli.com/user-guide)命令创建文件。
 
 ```
-ember g route user
+ember g route users
 ember g model user username:string email:string
 ember g adapter application
 ```
@@ -257,14 +257,14 @@ npm install supervisor
 locationType: 'hash',
 ```
 
-`auto`改为`hash`。访问Ember项目的URL则需要注意：[http://localhost:4200/user](http://localhost:4200/user)改为[http://localhost:4200/#/user](http://localhost:4200/#/user)。增加一个`#`号。
+`auto`改为`hash`。访问Ember项目的URL则需要注意：[http://localhost:4200/users](http://localhost:4200/users)改为[http://localhost:4200/#/users](http://localhost:4200/#/users)。增加一个`#`号。
 
 ### 获取数据、显示数据
 
 首先简单列出数据库数据。
 
 ```html
-<!-- app/templates/user.hbs -->
+<!-- app/templates/users.hbs -->
 <h1>用户列表</h1>
 
 <table class="table table-striped table-hover">
@@ -302,7 +302,7 @@ locationType: 'hash',
 ```
 
 ```js
-// app/routes/user.js
+// app/routes/users.js
 import Ember from 'ember';
 
 export default Ember.Route.extend({
@@ -312,7 +312,7 @@ export default Ember.Route.extend({
 });
 ```
 
-目前项目还没连接到任何数据库，也没有使用自定义的适配器，如果直接执行[http://localhost:4200/#/user](http://localhost:4200/#/user)可以在控制台看到是会报错的。那么下一步该如何处理呢？？
+目前项目还没连接到任何数据库，也没有使用自定义的适配器，如果直接执行[http://localhost:4200/#/users](http://localhost:4200/#/users)可以在控制台看到是会报错的。那么下一步该如何处理呢？？
 
 ## 加入适配器
 
@@ -344,11 +344,11 @@ export default DS.RESTAdapter.extend({
 });
 ```
 
-等待项目重启完毕，仍然是访问[http://localhost:4200/#/user](http://localhost:4200/#/user)，在控制台仍然看到前面的错误，截图如下：
+等待项目重启完毕，仍然是访问[http://localhost:4200/#/user](http://localhost:4200/#/users)，在控制台仍然看到前面的错误，截图如下：
 
-![无后端服务](/Users/ubuntuvim/Pictures/博客图片/ember博客/16072601.tiff)
+![无后端服务](http://blog.ddlisting.com/content/images/2016/07/16072601-3.png)
 
-为何还是错误呢？如果能看到错误说明你的程序是正确，到目前为止还没提供任何的后端服务，虽然前面使用`ember g server`创建了node后端服务，但是并没有针对每个请求做处理。当你访问路由`user`在进入回到`model`时候会发送请求获取所有模型`user`数据，请求首选转到Ember Data（store)，但是在store中并没有，然后请求继续转到适配器`RESTAdapter`，适配器会构建URL得到`GET`请求`http://localhost:4200/users`，至于是如何构建URL的请看[]()。这个请求可以在报错的信息中看到。但是为何会报错呢？很正常，因为我的后端服务并没响应这个请求。下面针对这个请求做处理。
+为何还是错误呢？如果能看到错误说明你的程序是正确，到目前为止还没提供任何的后端服务，虽然前面使用`ember g server`创建了node后端服务，但是并没有针对每个请求做处理。当你访问路由`user`在进入回到`model`时候会发送请求获取所有模型`user`数据，请求首选转到Ember Data（store)，但是在store中并没有，然后请求继续转到适配器`RESTAdapter`，适配器会构建URL得到`GET`请求`http://localhost:4200/users`，至于是如何构建URL的请看[build url method](https://github.com/emberjs/data/blob/master/addon/-private/adapters/build-url-mixin.js)。这个请求可以在报错的信息中看到。但是为何会报错呢？很正常，因为我的后端服务并没响应这个请求。下面针对这个请求做处理。
 
 修改`server/index.js`。
 
@@ -454,11 +454,11 @@ export default DS.RESTAdapter.extend({
   });
 ```
 
-之前面唯一不同的就是请求的URL不一样了，原来是[http://localhost:4200/user](http://localhost:4200/user)改为[http://localhost:4200/api/v1/user](http://localhost:4200/api/v1/user)。那么这样做的好处是什么呢？当你的后端的API更新的时候这个设置是非常有用的，只需要设置命名前缀就能适应不用版本的API。
+之前面唯一不同的就是请求的URL不一样了，原来是[http://localhost:4200/users](http://localhost:4200/users)改为[http://localhost:4200/api/v1/users](http://localhost:4200/api/v1/users)。那么这样做的好处是什么呢？当你的后端的API更新的时候这个设置是非常有用的，只需要设置命名前缀就能适应不用版本的API。
 
 项目重启之后，再次进入到路由`users`可以看到返回的3条数据。如下截图：
 
-![结果列表]()
+![结果列表](http://blog.ddlisting.com/content/images/2016/07/16072602.png)
 
 到此，我想你应该知道个大概了吧！！更多有关适配器的介绍请看下面的2篇博文：
 
@@ -485,7 +485,7 @@ export default JSONAPIAdapter.extend({
 
 修改适配器为`JSONAPIAdapter`。如果你不修改后端的服务那么控制台可以看到报错信息。
 
-![JSONAPIAdapter报错信息]()
+![JSONAPIAdapter报错信息](http://blog.ddlisting.com/content/images/2016/07/16072603.png)
 
 从截图当中可以清楚地看到报错出来的错误，`must return a valid JSON API document`必须是一个有效jsonapi文档。要修复好这个错误也很简单，只需要滚吧后端服务返回的数据格式改成jsonapi的就行了。请看下面的代码：
 
@@ -616,17 +616,39 @@ module.exports = function(app) {
 
 相比之前的代码只是引入了mysql，增加连接对象声明，然后在请求处理方法里查询数据，默认在数据库初始化了3条数据，如下截图，另外 **为了简单起见我仍然使用的是`RESTAdapter`适配器，这样处理也相对简单。** 获取连接对象的代码应该不用过多解释了，就是填写你本地连接数据库的对应配置信息就行了。
 
-![数据库数据]()
+![数据库数据](http://blog.ddlisting.com/content/images/2016/07/16072604.png)
 
 
 记得修改适配器为`RESTAdapter`。
 
 重启项目。进入路由`users`可以看到数据库的数据正确显示出来了。
 
-![显示数据库数据]()
+![显示数据库数据](http://blog.ddlisting.com/content/images/2016/07/16072705.png)
+
+## CRUD操作
+
+对于CRUD操作都举一个例子，由于前面已经介绍过`findAll`查询就不在此介绍CRUD中的R了。下面就对另外三个做一个例子：
+更多有关数据的操作请看[Ember.js 入门指南——新建、更新、删除记录](http://blog.ddlisting.com/2016/04/16/xin-jian-geng-xin-shan-chu-ji-lu/)。
+
+为了方便演示再增加几个路由和模板。
+
+```bash
+ember g template users/index
+ember g route users/new
+ember g route users/edit
+```
+
+上述3个命令创建了三个`users`的子路由和子模板。
+
+
+### 新增
+
+由于项目使用的是Ember Data，增加数据也是很简单的，直接调用`createRecord()`创建一个`record`之后再调用`save()`方法保存到服务器。
+
 
 <br>
-未完待续，后面将介绍增加、修改、删除数据的方法，另外如果有时间再把分页也引入
+
+**未完待续，后面将介绍增加、修改、删除数据的方法，另外如果有时间再把分页也引入**
 
 
 ## 文章源码
