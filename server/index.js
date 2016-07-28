@@ -207,25 +207,39 @@ module.exports = function(app) {
   // 处理请求 DELETE http://localhost:4200/users/id 删除记录
   app.delete('/api/v1/users/:id', function(req, res) {
 
-    console.log("删除 req.params.id = " + req.params.id);
+    var jsonArr = new Array();
+    var id = req.params.id;
+    console.log("删除 req.params.id = " + id);
 
     // 打开数据库连接
     pool.getConnection(function(err, conn) {  
-      var queryParams = [ req.params.id ];  
-      var query = conn.query('delete from user where id = ?', queryParams, function(err, result) {  
-          if (err) throw err;
+      var queryParams = [ id ];  
+      var query = conn.query('select * from user where id = ?', queryParams, function(err, results, fields) {  
+          if (err) {
+            console.log(err);
+            throw err;
+        } 
 
-          console.log('result = ' + result);
-          // 返回前端
-          // res.sendStatus(200);
-          res.status(200).send({
-                users: {
-                  id: null,
-                  username: null,
-                  email: null
-                }
-            });
+        //遍历返回的数据并设置到返回的json对象中，通常情况下只有一个数据，直接取第一个数据返回
+        if (results && results.length > 0) {
+          jsonArr.push({
+              id: results[0].id,
+              username: results[0].username,
+              email: results[0].email
+          });
+        }
+
       });
+
+      query = conn.query('delete from user where id = ?', queryParams, function(err, result) {  
+          if (err) throw err;
+      });
+      console.log('jsonArr == ' + jsonArr);
+      // 删除的数据返回前端
+      res.status(200).send({
+          users: jsonArr
+      });
+
       console.log('sql: ' + query.sql);
       conn.release();  //释放连接，放回到连接池
     });
