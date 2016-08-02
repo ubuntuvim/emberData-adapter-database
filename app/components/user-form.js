@@ -1,3 +1,5 @@
+// app/components/user-form.js
+// 新增，修改user
 import Ember from 'ember';
 
 export default Ember.Component.extend({

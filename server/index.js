@@ -247,13 +247,7 @@ module.exports = function(app) {
           if (err) throw err;
 
           // 返回前端
-          res.status(200).send({
-              users: {
-                id: id,
-                username: '',
-                email: ''
-              }
-          });
+          res.status(200).send({});
       });
 
       console.log('sql: ' + query.sql);

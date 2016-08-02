@@ -641,14 +641,400 @@ ember g route users/edit
 上述3个命令创建了三个`users`的子路由和子模板。
 
 
-### 新增
+### 新增、更新
 
 由于项目使用的是Ember Data，增加数据也是很简单的，直接调用`createRecord()`创建一个`record`之后再调用`save()`方法保存到服务器。
+另外新增和更新的处理方式相似，就直接写在一个方法内。
+
+#### Ember前端处理代码
+
+##### component:user-form.js
+
+```js
+// app/components/user-form.js
+// 新增，修改user
+import Ember from 'ember';
+
+export default Ember.Component.extend({
+  tipInfo: null,
+
+  actions: {
+    saveOrUpdate(id, user) {
+      if (id) {  //更新
+        let username = this.get('model.username');
+        let email = this.get('model.email');
+        if (username && email) {
+          this.store.findRecord('user', id).then((u) => {
+            
+            u.set('username', username);
+            u.set('email', email);
+
+            u.save().then(() => {
+              this.set('tipInfo', "更新成功");
+              // this.set('model.username', '');
+              // this.set('model.email', '');
+            }); 
+          });
+        } else {
+          this.set('tipInfo', "请输入username和email！");
+        }
+
+      } else {  //新增
+
+        let username = this.get('model.username');
+        let email = this.get('model.email');
+        if (username && email) {
+          this.get('store').createRecord('user', {
+            username: username,
+            email: email
+          }).save().then(() => {
+            this.set('tipInfo', "保存成功");
+            this.set('model.username', '');
+            this.set('model.email', '');
+          }, (err) => {
+            this.set('tipInfo', "保存失败"+err);
+          }); 
+        } else {
+          this.set('tipInfo', "请输入username和email！");
+        }
+    
+      }
+    }
+  }
+});
+```
+
+新增和修改处理是相似的，根据`id`是否为空判断是否是新增还是更新。
+
+#### hbs:user-form.hbs
+
+```html
+{{! 新增、修改都用到的表单，提出为公共部分}}
+<div class="container">
+  <h1>{{title}}</h1>
+
+  <div class="row bg-info" style="padding: 10px 20px 0 0;">
+    <p class="pull-right" style="margin-right: 20px;">
+      {{#link-to 'users' class="btn btn-primary"}}返回{{/link-to}}
+    </p>
+  </div>
+
+  
+  <!-- <form {{action 'add' on='submit'}}> -->
+  <form>
+    <div class="form-group">
+      <label for="exampleInputPassword1">username</label>
+      {{input type="text" class="form-control" id="usernameId" name='username' placeholder="username" value=model.username}}
+    </div>
+
+    <div class="form-group">
+      <label for="exampleInputEmail1">Email address</label>
+      {{input type="text" class="form-control" id="exampleInputEmail1" placeholder="Email" value=model.email}}
+    </div>
+    <button type="submit" class="btn btn-primary" {{action 'saveOrUpdate' model.id model}}>保存</button>
+  </form>
+
+  {{#if tipInfo}}
+    <div class="alert alert-success alert-dismissible" role="alert">
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      {{tipInfo}}
+    </div>
+  {{/if}}
+
+</div>
+```
+
+##### route:edit.js
+
+```js
+// app/routes/users/edit.js
+import Ember from 'ember';
+
+export default Ember.Route.extend({
+  // 根据id获取某个记录
+  model(params) {
+    return this.store.findRecord('user', params.user_id);
+  }
+});
+```
+
+点击“编辑”的时候需要根据被点击记录的`id`查询数据详情，并返回到编辑页面。
+
+##### new.hbs
+
+```html
+{{! 增加数据的表单}}
+{{user-form title='新增user' store=store model=model}}
+```
+
+##### edit.hbs
+
+```html
+{{! 修改数据的表单}}
+{{user-form title='修改user' store=store model=model}}
+```
+
+提取新增和修改这两个模板的相同代码为一个组件，两个模板都调用组件。
 
 
-<br>
+#### 后端处理代码
 
-**未完待续，后面将介绍增加、修改、删除数据的方法，另外如果有时间再把分页也引入**
+与前端对应的要有相应的后端处理服务，增加2个路由监听，一个是监听`post`提交（新增），一个是`put`提交（更新）。
+
+```js
+// 处理请求 POST http://localhost:4200/users
+  app.post('/api/v1/users', function(req, res) {
+    
+    var username = req.body.user.username;
+    console.log("req.body.user.username = " + username);
+    var email = req.body.user.email;
+    console.log("req.body.user.email = " + email);
+
+    // 打开数据库连接
+    pool.getConnection(function(err, conn) {  
+      var queryParams = { username: username, email: email };  
+      var query = conn.query('insert into user SET ?', queryParams, function(err, result) {  
+          if (err) throw err;
+          
+          console.log('result = ' + result);
+          // 返回前端
+          if (result) {
+            res.status(200).send({
+                users: {
+                  id: result.insertId,
+                  username: username,
+                  email: email
+                }
+            });
+          } else {  //没有数据返回一个空的
+            // 返回前端
+            res.status(200).send({
+                users: {
+                  id: '',
+                  username: '',
+                  email: ''
+                }
+            });
+          } 
+          
+      });
+      console.log('sql: ' + query.sql);
+      conn.release();  //释放连接，放回到连接池
+    });
+  });
+    
+
+
+    // 处理请求 POST http://localhost:4200/users/id  根据id更新某个数据
+  app.put('/api/v1/users/:id', function(req, res) {
+
+    console.log('更新 POST /api/v1/users/:id');
+    console.log('req.params.id = ' + req.params.id);
+    console.log('req.body.user.username = ' + req.body.user.username);
+    var jsonArr = new Array();
+    // 打开数据库连接
+    pool.getConnection(function(err, conn) {  
+      // 参数的次序要与SQL语句的参数次序一致
+      var queryParams = [ req.body.user.username, req.body.user.email, req.params.id ];
+      
+      var query = conn.query('UPDATE user SET username = ?, email = ? where id = ?', queryParams, function(err, results, fields) {  
+          if (err) {
+            console.log('更新出错：'+err);
+            throw err;
+          } 
+
+        //遍历返回的数据并设置到返回的json对象中，通常情况下只有一个数据，直接取第一个数据返回
+        if (results && results.length > 0) {
+          jsonArr.push({
+              id: results[0].id,
+              username: results[0].username,
+              email: results[0].email
+          });
+
+          // 返回前端
+          res.status(200).send({
+              users: jsonArr
+          });
+        }
+        //  else {  //没有数据返回一个空的
+        //   // 返回前端
+        //   res.status(200).send({
+        //       users: {
+        //         id: '',
+        //         username: '',
+        //         email: ''
+        //       }
+        //   });
+        // } 
+        console.log('SQL: ' + query.sql);
+
+      });
+      conn.release();  //释放连接，放回到连接池
+    });
+  });
+```
+
+为何新增对应的是`post`方法，更新对应的是`put`方法，请看[the rest adapter](https://guides.emberjs.com/v1.13.0/models/the-rest-adapter/)的详细介绍（主要是第一个表格的内容）。
+
+### 简单测试
+
+点击右上角的新增按钮进入新增界面。
+
+![新增按钮](http://blog.ddlisting.com/content/images/2016/08/16080301.png)
+
+进入新增界面后输入相应信息（我就不做数据的格式校验了，有需要自己校验数据格式）。然后点击“保存”，保存成功会有提示信息。
+
+![](http://blog.ddlisting.com/content/images/2016/08/16080302.png)
+
+![保存成功提示信息](http://blog.ddlisting.com/content/images/2016/08/16080304.png)
+
+点击右上角的“返回”回到主列表页面，查看新增的数据是否保存成功。
+
+![主列表数据](http://blog.ddlisting.com/content/images/2016/08/16080305.png)
+
+可以看到刚刚新增的数据已经显示在列表上，为了进一步验证数据已经保存成功，直接查看数据库。
+
+![数据库数据](http://blog.ddlisting.com/content/images/2016/08/16080306.png)
+
+可以看到数据库也已经成功保存了刚刚新增的数据。
+
+修改的测试方式我就不啰嗦了，点击列表上的修改按钮进入修改页面，修改后保存既可以，请自行测试。
+
+### 删除
+
+删除处理相比新增更加简单，直接发送一个`delete`请求即可。
+
+#### Ember前端处理
+
+```js
+// app/routes/user.js
+import Ember from 'ember';
+
+export default Ember.Route.extend({
+  model() {
+    return this.store.findAll('user');
+  },
+  actions: {
+    // 删除记录
+    del(id) {
+      console.log('删除记录：' + id);
+      this.get('store').findRecord('user', id).then((u) => {
+          u.destroyRecord(); // => DELETE to /users/2
+      });
+    }
+  }
+});
+```
+
+```html
+<!-- app/templates/index.hbs -->
+
+<h1>用户列表</h1>
+
+<div class="row bg-info" style="padding: 10px 20px 0 0;">
+  <p class="pull-right" style="margin-right: 20px;">
+    {{#link-to 'users.new' class="btn btn-primary"}}新增{{/link-to}}
+  </p>
+</div>
+
+
+<table class="table table-striped table-hover">
+  <thead>
+    <tr>
+      <th>
+        #
+      </th>
+      <th>
+        用户名
+      </th>
+      <th>
+        邮箱
+      </th>
+      <th>
+      操作
+      </th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {{#each model as |user|}}
+    <tr>
+      <td>
+        {{user.id}}
+      </td>
+      <td>
+        {{user.username}}
+      </td>
+      <td>
+        {{user.email}}
+      </td>
+      <td>
+      {{#link-to 'users.edit' user.id}}修改{{/link-to}} | 
+      <span {{action 'del' user.id}} style="cursor: pointer; color: #337ab7;">删除</span>
+      </td>
+    </tr>
+    {{/each}}
+  </tbody>
+
+</table>
+```
+
+这段代码的与前面的代码基本一致，就是增加了删除。
+
+#### 后端处理
+
+在后端增加一个监听删除的路由。
+
+```js
+// 处理请求 DELETE http://localhost:4200/users/id 删除记录
+  app.delete('/api/v1/users/:id', function(req, res) {
+
+    var jsonArr = new Array();
+    var id = req.params.id;
+    console.log("删除 req.params.id = " + id);
+
+    // 打开数据库连接
+    pool.getConnection(function(err, conn) {  
+      var queryParams = [ id ];  
+      var query = conn.query('delete from user where id = ?', queryParams, function(err, result) {  
+          if (err) throw err;
+
+          // 返回前端
+          res.status(200).send({});
+      });
+
+      console.log('sql: ' + query.sql);
+      conn.release();  //释放连接，放回到连接池
+    });
+  });
+```
+
+#### 测试删除
+
+测试删除很简单，直接在列表上点击“删除”按钮即可删除一条记录。界面和数据库的截图我就不贴出来了，自己动手测试就知道了！！
+
+**数据可以正确删除，但是，删除之后控制台会报如下错误：**
+
+![删除报错](http://blog.ddlisting.com/content/images/2016/08/16080307.png)
+
+找了官网文档[the rest adapter delete record](https://guides.emberjs.com/v1.13.0/models/the-rest-adapter/#toc_json-root)按照官网的文档处理仍然报错！目前还没找到好的处理方法，不知道是哪里出了问题，如果读者知道请告诉我，谢谢。
+
+到此CRUD操作也完成了，不足的就是在处理删除的时候还是有点问题，目前还没找到觉得办法！但是总的来说对于CRUD的操作都是这么处理的，调用的方法也都是上述代码所使用的方法。
+
+**未完待续……还差分页没完成。**
+
+
+## 总结
+
+文章写到这里已经把我所想的内容介绍完毕了，不知道读者是否看明白了。其中主要理解的知识点是：
+
+1. Ember Data和adapter、record、model的关系
+2. 如何自定义适配器
+3. 如何根据Ember前端请求编写后端处理
+4. CRUD操作
+5. 分页处理（目前还没整合进来）
+
+明白了上述几点，本文的目的也达到了！如何有疑问欢迎给我留言，也期待着读者能给我解答删除报错的问题！
 
 
 ## 文章源码
